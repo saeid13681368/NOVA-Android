@@ -77,6 +77,7 @@ footer{text-align:center;color:#8293ad;font-size:11px;padding:22px}
  <div class="tabs">
   <button class="tab active" onclick="showTab('chatTab',this)">گفت‌وگو</button>
   <button class="tab" onclick="showTab('memoryTab',this)">حافظه</button>
+  <button class="tab" onclick="showTab('settingsTab',this)">تنظیمات</button>
   <button class="tab" onclick="showTab('teamTab',this)">تیم هوش</button>
  </div>
  <section id="chatTab" class="panel">
@@ -102,6 +103,15 @@ footer{text-align:center;color:#8293ad;font-size:11px;padding:22px}
   </div>
   <div id="notes" class="small" style="margin-top:15px">در حال بارگذاری...</div>
   <button onclick="loadMemory()" style="margin-top:12px">تازه‌سازی حافظه</button>
+ </section>
+ <section id="settingsTab" class="panel hidden">
+  <h3>تنظیمات اتصال هوش مصنوعی</h3>
+  <p class="small">کلید OpenRouter فقط در فضای خصوصی برنامه ذخیره می‌شود و به رابط کاربری بازگردانده نمی‌شود.</p>
+  <div class="inputrow">
+   <input id="apiKeyInput" type="password" placeholder="کلید API را وارد کن" autocomplete="off">
+   <button onclick="saveApiKey()">ذخیره</button>
+  </div>
+  <div id="apiKeyStatus" class="small">کلید API هنوز بررسی نشده است.</div>
  </section>
  <section id="teamTab" class="panel hidden">
   <h3>معماری تیم هوش NOVA</h3>
@@ -359,6 +369,34 @@ if(!SpeechRecognitionAPI){
  setVoiceStatus('میکروفون آماده است؛ برای شروع صحبت دکمه را بزن.');
 }
 
+async function saveApiKey(){
+ const input=document.getElementById('apiKeyInput');
+ const status=document.getElementById('apiKeyStatus');
+ const key=input.value.trim();
+ if(!key){
+  status.textContent='ابتدا کلید API را وارد کن.';
+  return;
+ }
+ status.textContent='در حال ذخیره امن کلید...';
+ try{
+  const response=await fetch('/api/settings/api-key',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({api_key:key})
+  });
+  const result=await response.json();
+  if(!response.ok || !result.success){
+   status.textContent=result.message||'ذخیره کلید انجام نشد.';
+   return;
+  }
+  input.value='';
+  status.textContent='کلید ذخیره شد. وضعیت اتصال در حال به‌روزرسانی است.';
+  await refreshStatus();
+ }catch(error){
+  status.textContent='ارتباط با سرور برقرار نشد.';
+ }
+}
+
 async function loadMemory(){
  const box=document.getElementById('notes');
  try{
@@ -386,22 +424,25 @@ async function deleteNote(n){
  await fetch('/api/forget',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:n})});
  loadMemory();
 }
-fetch('/api/status').then(r=>r.json()).then(d=>{
+async function refreshStatus(){
+ try{
+  const response=await fetch('/api/status',{cache:'no-store'});
+  const d=await response.json();
   document.getElementById('status').textContent =
    d.server_online ? 'روشن' : 'خاموش';
-
   document.getElementById('providerStatus').textContent =
    d.provider_configured
-    ? 'درگاه OpenRouter پیکربندی شده؛ اتصال زنده هنوز آزمایش نشده'
-    : 'تنظیمات درگاه یا کلید API کامل نیست';
-
+    ? 'کلید OpenRouter ذخیره شده؛ اتصال زنده هنوز آزمایش نشده'
+    : 'کلید API هنوز تنظیم نشده است';
   document.getElementById('modelStatus').textContent =
    'مدل: '+(d.model || 'نامشخص')+' | اتصال واقعی: آزمایش نشده';
- }).catch(()=>{
+ }catch(error){
   document.getElementById('status').textContent='نامشخص';
   document.getElementById('providerStatus').textContent='وضعیت درگاه قابل دریافت نیست';
   document.getElementById('modelStatus').textContent='وضعیت مدل قابل دریافت نیست';
- });
+ }
+}
+refreshStatus();
 
 let installPrompt;
 const installBtn=document.getElementById('installBtn');
@@ -484,7 +525,14 @@ class Handler(BaseHTTPRequestHandler):
             data = self.read_data()
             if not isinstance(data, dict):
                 raise ValueError("ساختار درخواست نامعتبر است")
-            if self.path == "/api/chat":
+            if self.path == "/api/settings/api-key":
+                from core.ai.config import save_api_key
+                key = data.get("api_key")
+                if not isinstance(key, str):
+                    raise ValueError("کلید نامعتبر است")
+                save_api_key(key)
+                self.send_data({"success": True, "message": "کلید ذخیره شد."})
+            elif self.path == "/api/chat":
                 prompt = str(data.get("prompt", "")).strip()
                 if not prompt:
                     return self.send_data({"success": False, "message": "پیام خالی است"})
