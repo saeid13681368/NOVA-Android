@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.env
+.env.*
+**/api_key
+**/memory.json
+**/backups/
+**/logs/
+**/data/
+backups/
+logs/
+.gradle/
+build/
+local.properties
+*.tmp
+*.before_*

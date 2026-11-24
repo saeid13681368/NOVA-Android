@@ -1,0 +1,31 @@
+{
+  "format": "NOVA_SOURCE_PACKAGE",
+  "format_version": 1,
+  "created_utc": "2026-11-22T21:20:35.417029+00:00",
+  "file_count": 23,
+  "files": {
+    "README.md": "3c07597ea53b39d3d16da31ab6987c69b436217bd5a7f32b9af6f3612706270a",
+    "core/ai/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "core/ai/config.py": "23c097270a823a2bce09b62e30c8274dcff9c0be13349fbd99a63a91e91c7e9e",
+    "core/ai/gateway.py": "eb1cf636b7955acd3a29c91b0efb8866e77e9b01053d11192e3f0b6a5a459b48",
+    "core/ai/multi_model.py": "e2390754d84692f9d98554f5134798bf4ab3ce6302a52b5215256a0d764cadf3",
+    "core/ai/multimodel.py": "89524ea7488fa6e0a5ce00672cceed8d243bd687e402ce7632086c30bd23a739",
+    "core/ai/registry.py": "c20bae34c9fa505b1b8391ca2a985c0397ceaa56505ecaa44bc9486309ad2952",
+    "core/ai/status.py": "b423fa56ffa72bf91ca4e52c06aed19c5388c00bb05f2d88ea56e330ba884d36",
+    "core/ai/team_engine.py": "cb3d2bbd0cb82d0fcec8b86348dcb3e3f09a303aec32940266ae25ac4e74eaa8",
+    "core/brain.py": "828e912b3a4d0abe3504b6cb1556a61a36946d0baf3b0d2b58ddc4b19aa3b491",
+    "core/command_center.py": "00e3c7b0dcf32ba11c3b3e446b2810e9443abf797c3b61e27ab0657c6de8937b",
+    "core/errors.py": "da665d49b057874e015825de975c71121ddaf6421e022fb159aeb14b799d1e41",
+    "core/integrations/__init__.py": "e5748fb1da1a3c2e69db563723de3a59df213a6dd8c331f47aa7bc5260427fb7",
+    "core/integrations/hub.py": "a934148c21930541a5b5a15b7fdee2d41cd7cfda7aed4ffa62eb3bbf95a2c9b7",
+    "core/integrations/openrouter_adapter.py": "70268482152cc8335b762face81a6872f5c9fd35bdeacb98c65d5306aba21fc8",
+    "core/main.py": "4f0bb9c7e1cff3e84e8d7c32e0a38a688ed7045b2c6a1f25e8967868fe58540f",
+    "core/portability.py": "7f7f1e4f414030becc7ab5644a6079435c293d3cfd3b5f6fa6d425f645ea30a2",
+    "core/tasks.py": "fa812c642c8ffc1a6e9f9ce2ccd7e8719b8da5032db98f863bce6ed9f16822da",
+    "core/web_app.py": "0309d27bd4bfd976dfe3b33e5ff6c22368d9f49948bf1f18207bd614f5555bbb",
+    "memory/store.py": "cd839cbb6645c5d6945cbad79a0b8576704c42800bd5deb5f057f8cdf5e81bdf",
+    "tools/package_nova.py": "d1f57040a911880ab2ab74847a220b7d4751058bb37c427caf0cae3323bc94af",
+    "web/icon-192.png": "3b6d7b3bc80e9f98cf224744db4b1d948360e5c712be425eda9fe1a364dab463",
+    "web/icon-512.png": "7677cf8020d3b80e67e8ec227d0a0d8860b0e89b67e43c4a1088799fdfe374d2"
+  }
+}
