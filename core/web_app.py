@@ -10,6 +10,11 @@ from memory.store import load, remember, forget
 gateway = AIGateway()
 team_engine = NOVATeamEngine()
 
+CONNECTION_STATUS = {
+    "verified": False,
+    "model": None
+}
+
 PAGE = r"""
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -111,6 +116,7 @@ footer{text-align:center;color:#8293ad;font-size:11px;padding:22px}
    <input id="apiKeyInput" type="password" placeholder="کلید API را وارد کن" autocomplete="off">
    <button onclick="saveApiKey()">ذخیره</button>
   </div>
+  <button id="testConnectionBtn" onclick="testOpenRouterConnection()" style="margin-top:10px">آزمایش واقعی اتصال</button>
   <div id="apiKeyStatus" class="small">کلید API هنوز بررسی نشده است.</div>
  </section>
  <section id="teamTab" class="panel hidden">
@@ -390,10 +396,35 @@ async function saveApiKey(){
    return;
   }
   input.value='';
-  status.textContent='کلید ذخیره شد. وضعیت اتصال در حال به‌روزرسانی است.';
+  status.textContent='کلید ذخیره شد. برای تأیید اتصال، «آزمایش واقعی اتصال» را بزن.';
   await refreshStatus();
  }catch(error){
   status.textContent='ارتباط با سرور برقرار نشد.';
+ }
+}
+
+async function testOpenRouterConnection(){
+ const status=document.getElementById('apiKeyStatus');
+ const button=document.getElementById('testConnectionBtn');
+ button.disabled=true;
+ status.textContent='در حال ارسال درخواست واقعی آزمایشی به OpenRouter...';
+ try{
+  const response=await fetch('/api/settings/test-connection',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({})
+  });
+  const result=await response.json();
+  if(result.success){
+   status.textContent='اتصال تأیید شد ✓ | مدل گزارش‌شده: '+(result.reported_model||'نامشخص');
+  }else{
+   status.textContent='اتصال ناموفق | '+(result.error_code||'خطای نامشخص')+' | '+(result.message||'بدون جزئیات');
+  }
+  await refreshStatus();
+ }catch(error){
+  status.textContent='ارتباط با سرور NOVA برقرار نشد.';
+ }finally{
+  button.disabled=false;
  }
 }
 
@@ -431,11 +462,16 @@ async function refreshStatus(){
   document.getElementById('status').textContent =
    d.server_online ? 'روشن' : 'خاموش';
   document.getElementById('providerStatus').textContent =
-   d.provider_configured
-    ? 'کلید OpenRouter ذخیره شده؛ اتصال زنده هنوز آزمایش نشده'
-    : 'کلید API هنوز تنظیم نشده است';
+   d.model_verified
+    ? 'کلید ذخیره شده؛ اتصال واقعی تأیید شده'
+    : d.provider_configured
+     ? 'کلید ذخیره شده؛ اتصال هنوز آزمایش نشده'
+     : 'کلید API هنوز تنظیم نشده است';
   document.getElementById('modelStatus').textContent =
-   'مدل: '+(d.model || 'نامشخص')+' | اتصال واقعی: آزمایش نشده';
+   'مدل تنظیم‌شده: '+(d.model || 'نامشخص')+
+   (d.model_verified
+    ? ' | مدل تأییدشده: '+(d.verified_model || 'نامشخص')
+    : ' | اتصال واقعی: آزمایش نشده');
  }catch(error){
   document.getElementById('status').textContent='نامشخص';
   document.getElementById('providerStatus').textContent='وضعیت درگاه قابل دریافت نیست';
@@ -502,7 +538,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_data(load())
         elif self.path == "/api/status":
             from core.ai.config import AI_CONFIG
-            from core.ai.multimodel import PRIMARY_MODEL
+            from core.ai.multimodel import get_primary_model
 
             key_configured = bool(str(AI_CONFIG.get("api_key") or "").strip())
             url_configured = bool(str(AI_CONFIG.get("openrouter_url") or "").strip())
@@ -513,9 +549,10 @@ class Handler(BaseHTTPRequestHandler):
                 "name": "NOVA",
                 "provider": "OpenRouter",
                 "provider_configured": key_configured and url_configured,
-                "model": PRIMARY_MODEL or "openrouter/free",
-                "model_verified": False,
-                "model_status": "not_tested"
+                "model": get_primary_model(),
+                "model_verified": bool(CONNECTION_STATUS.get("verified")),
+                "model_status": "verified" if CONNECTION_STATUS.get("verified") else "not_tested",
+                "verified_model": CONNECTION_STATUS.get("model")
             })
         else:
             self.send_error(404)
@@ -531,7 +568,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(key, str):
                     raise ValueError("کلید نامعتبر است")
                 save_api_key(key)
+                CONNECTION_STATUS["verified"] = False
+                CONNECTION_STATUS["model"] = None
                 self.send_data({"success": True, "message": "کلید ذخیره شد."})
+            elif self.path == "/api/settings/test-connection":
+                result = AIGateway().test_connection()
+                CONNECTION_STATUS["verified"] = bool(result.get("success"))
+                CONNECTION_STATUS["model"] = result.get("reported_model")
+                self.send_data(result)
             elif self.path == "/api/chat":
                 prompt = str(data.get("prompt", "")).strip()
                 if not prompt:

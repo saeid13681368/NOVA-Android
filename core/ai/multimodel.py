@@ -18,6 +18,10 @@ MULTI_ON = data_path("data/MULTIMODEL_ENABLED", ROOT / "data" / "MULTIMODEL_ENAB
 EMERGENCY_STOP = data_path("data/MULTIMODEL_STOP", ROOT / "data" / "MULTIMODEL_STOP")
 
 PRIMARY_MODEL = AI_CONFIG.get("model", "openrouter/free")
+
+def get_primary_model():
+    return AI_CONFIG.get("model") or "openrouter/free"
+
 REVIEW_MODEL = os.getenv(
     "NOVA_AI_REVIEW_MODEL", "openai/gpt-4.1-mini"
 )
@@ -60,7 +64,7 @@ def state():
         "mode": "emergency-stop" if EMERGENCY_STOP.exists()
                 else "multi-model" if MULTI_ON.exists()
                 else "single-model",
-        "primary_model": PRIMARY_MODEL,
+        "primary_model": get_primary_model(),
         "review_model": REVIEW_MODEL,
         "ledger": str(LEDGER)
     }
@@ -96,21 +100,25 @@ def run(prompt, gateway=None):
         }
 
     gateway = gateway or AIGateway()
+    primary_model = get_primary_model()
 
     # Single-model mode: one primary request, no reviewer.
     if not MULTI_ON.exists():
         result = gateway.ask(
             prompt,
             provider="openrouter",
-            model_override=PRIMARY_MODEL
+            model_override=primary_model
         )
 
         if result.get("success"):
-            actual_model = result.get("model") or PRIMARY_MODEL
+            actual_model = result.get("model") or primary_model
             result["runtime_identity"] = {
                 "provider": "openrouter",
                 "mode": "single-model",
-                "primary_configured": PRIMARY_MODEL,
+                "configured_model": primary_model,
+                "reported_model": actual_model,
+                "model_status": "verified",
+                "primary_configured": primary_model,
                 "primary_reported": actual_model,
                 "review_configured": REVIEW_MODEL,
                 "review_status": "not_requested",
@@ -119,14 +127,14 @@ def run(prompt, gateway=None):
 
         return result
 
-    if not REVIEW_MODEL or REVIEW_MODEL == PRIMARY_MODEL:
+    if not REVIEW_MODEL or REVIEW_MODEL == primary_model:
         return {
             "success": False,
             "message": "مدل بازبین باید با مدل اصلی متفاوت باشد."
         }
 
     first = gateway.ask(
-        prompt, provider="openrouter", model_override=PRIMARY_MODEL
+        prompt, provider="openrouter", model_override=primary_model
     )
     if not first.get("success"):
         return first
@@ -146,7 +154,7 @@ def run(prompt, gateway=None):
         review_prompt, provider="openrouter", model_override=REVIEW_MODEL
     )
 
-    primary_actual = first.get("model") or PRIMARY_MODEL
+    primary_actual = first.get("model") or primary_model
 
     if second.get("success"):
         answer = second.get("answer", "")
@@ -159,7 +167,7 @@ def run(prompt, gateway=None):
         reviewer_actual = None
         final_model = primary_actual
 
-    urls = sorted(set(re.findall(r"https?://\\S+", answer)))
+    urls = sorted(set(re.findall(r"https?://\S+", answer)))
     record = {
         "record_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -179,7 +187,10 @@ def run(prompt, gateway=None):
         "runtime_identity": {
             "provider": "openrouter",
             "mode": "multi-model",
-            "primary_configured": PRIMARY_MODEL,
+            "configured_model": primary_model,
+            "reported_model": final_model,
+            "model_status": "verified",
+            "primary_configured": primary_model,
             "primary_reported": primary_actual,
             "review_configured": REVIEW_MODEL,
             "review_reported": reviewer_actual,

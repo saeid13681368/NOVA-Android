@@ -81,6 +81,7 @@ class OpenRouterAIProvider(AIProvider):
             return {
                 "success": False,
                 "provider": "openrouter",
+                "error_code": "key_missing",
                 "message": "API key is not configured."
             }
 
@@ -169,9 +170,22 @@ class OpenRouterAIProvider(AIProvider):
             except Exception:
                 detail = "متن خطای سرویس قابل خواندن نبود."
 
+            if error.code in (401, 403):
+                error_code = "auth_error"
+            elif error.code == 404:
+                error_code = "model_or_endpoint_error"
+            elif error.code == 429:
+                error_code = "rate_limit"
+            elif error.code == 402:
+                error_code = "payment_required"
+            else:
+                error_code = "http_error"
+
             return {
                 "success": False,
                 "provider": "openrouter",
+                "error_code": error_code,
+                "http_status": error.code,
                 "message": "API request failed with HTTP status "
                            + str(error.code)
                            + (": " + detail if detail else "")
@@ -180,13 +194,22 @@ class OpenRouterAIProvider(AIProvider):
             return {
                 "success": False,
                 "provider": "openrouter",
+                "error_code": "network_error",
                 "message": "Network connection failed."
             }
-        except (KeyError, IndexError, ValueError, TimeoutError):
+        except TimeoutError:
             return {
                 "success": False,
                 "provider": "openrouter",
-                "message": "Invalid response or request timed out."
+                "error_code": "timeout",
+                "message": "The provider request timed out."
+            }
+        except (KeyError, IndexError, ValueError, TypeError):
+            return {
+                "success": False,
+                "provider": "openrouter",
+                "error_code": "invalid_response",
+                "message": "Invalid response received from the provider."
             }
 
 
@@ -197,6 +220,42 @@ class AIGateway:
             "local": LocalAIProvider(),
             "cloud": CloudAIProvider(),
             "openrouter": OpenRouterAIProvider()
+        }
+
+    def test_connection(self):
+        """Send one real, isolated provider request without changing chat history."""
+        if not str(AI_CONFIG.get("api_key") or "").strip():
+            return {
+                "success": False,
+                "provider": "openrouter",
+                "error_code": "key_missing",
+                "message": "ابتدا کلید API را ذخیره کن."
+            }
+
+        model = AI_CONFIG.get("model") or "openrouter/free"
+        result = self.providers["openrouter"].generate(
+            "پاسخ بده فقط: NOVA_CONNECTION_OK",
+            history=[],
+            model_override=model
+        )
+
+        if not result.get("success"):
+            return {
+                "success": False,
+                "provider": "openrouter",
+                "error_code": result.get("error_code", "connection_failed"),
+                "http_status": result.get("http_status"),
+                "message": result.get("message", "اتصال برقرار نشد.")
+            }
+
+        reported_model = result.get("model") or model
+        return {
+            "success": True,
+            "provider": "openrouter",
+            "configured_model": model,
+            "reported_model": reported_model,
+            "model_status": "verified",
+            "message": "اتصال واقعی به OpenRouter تأیید شد."
         }
 
     def ask(self, prompt, provider="local", model_override=None):
